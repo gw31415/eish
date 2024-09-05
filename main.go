@@ -152,8 +152,8 @@ func ssh(args []string) int {
 }
 
 func createSubmitIdent(arg *awsargs, tmpDir string) (string, error) {
-	priv := filepath.Join(tmpDir, "id_rsa")
-	pub := filepath.Join(tmpDir, "id_rsa.pub")
+	priv := filepath.Join(tmpDir, "id_ed25519")
+	pub := filepath.Join(tmpDir, "id_ed25519.pub")
 	exec.Command("ssh-keygen", "-t", "rsa", "-N", "", "-f", priv).Run()
 
 	privAbs, err := filepath.Abs(priv)
@@ -199,7 +199,7 @@ func main() {
 		"-o",
 		"ProxyCommand=aws ec2-instance-connect open-tunnel --instance-id %h",
 	}
-	if aws.ident != "" {
+	if aws.ident == "" {
 		privKey, err := createSubmitIdent(aws, tmpDir)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
