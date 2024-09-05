@@ -30,23 +30,44 @@ func init() {
 	sshAvailable = err == nil
 }
 
+func hostIsEc2Instance(host string) bool {
+	// `^i-([\u\l\d]{8}|[\u\l\d]{17})^`
+	if !strings.HasPrefix(host, "i-") {
+		return false
+	}
+	hostr := []rune(host)
+	hostlen := len(hostr)
+	if hostlen != 10 && hostlen != 19 {
+		return false
+	}
+	for i := 2; i < hostlen; i++ {
+		c := hostr[i]
+		if (c < 'A' || c > 'Z') && (c < 'a' || c > 'z') && (c < '0' || c > '9') {
+			return false
+		}
+	}
+	return true
+}
+
 // values for ec2 instance connect
-type addr struct {
-	user string
-	host string
+type awsargs struct {
+	user  string
+	host  string
+	ident string
 }
 
 // parse arguments to get values for ec2 instance connect
-func argparse(args []string) *addr {
+func argparse(args []string) *awsargs {
 	// if aws command is not available, checking process is not needed anymore
 	if !awsAvailable {
 		return nil
 	}
 
-	user, host := "", ""
+	user, host, ident := "", "", ""
 
 	acnt := len(args)
 	i := 0
+argloop:
 	for i < acnt {
 		arg := args[i]
 
@@ -54,52 +75,58 @@ func argparse(args []string) *addr {
 			if len(arg) == 1 {
 				// arg is just '-' (invalid)
 				return nil
-			} else if len(arg) == 2 {
-				// type: -x value
-				opt := rune(arg[1])
-				if strings.ContainsRune(optsWithValue, opt) {
-					// skip the next arg as its value
-					i++
-					if opt == 'l' {
-						user = args[i]
+			}
+			argr := []rune(arg[1:])
+			arglen := len(argr)
+		charloop:
+			for ci, c := range argr {
+				if strings.ContainsRune(optsNoValue, c) {
+					continue charloop
+				} else if strings.ContainsRune(optsWithValue, c) {
+					if ci == arglen-1 {
+						i++ // skip the next arg as its value
+
+						// `-l value`
+						if c == 'l' {
+							user = args[i]
+						} else if c == 'i' {
+							ident = args[i]
+						}
+					} else {
+						// `-lvalue`
+						if c == 'l' {
+							user = string(argr[ci+1:])
+						} else if c == 'i' {
+							ident = string(argr[ci+1:])
+						}
 					}
-				} else if !strings.ContainsRune(optsNoValue, opt) {
-					// if the option is not in the list, it should be invalid
-					return nil
-				}
-			} else {
-				// type: -xvalue
-				opt := rune(arg[1])
-				if opt == 'l' {
-					user = arg[2:]
-				} else if !strings.ContainsRune(optsWithValue, opt) {
-					// if the option is not in the list, it should be invalid
+					i++ // when continue argloop, i should be increased
+					continue argloop
+				} else {
+					// if the option is not in the list, it should be invalid or unknown option
 					return nil
 				}
 			}
 		} else {
 			// user@host or host
-			if user != "" {
+			atat := strings.IndexRune(arg, '@')
+			if atat == -1 {
+				u, err := osuser.Current()
+				if err != nil {
+					return nil
+				}
+				user = u.Username
 				host = arg
 			} else {
-				// if user is not specified, it should be user@host or user is same as host
-				atat := strings.IndexRune(arg, '@')
-				if atat == -1 {
-					u, err := osuser.Current()
-					if err != nil {
-						return nil
-					}
-					user = u.Username
-					host = arg
-				} else {
+				host = arg[atat+1:]
+				if user == "" {
 					user = arg[:atat]
-					host = arg[atat+1:]
 				}
 			}
 
 			// host is ec2 instance id pattern or not
-			if strings.HasPrefix(host, "i-") {
-				return &addr{user, host}
+			if hostIsEc2Instance(host) {
+				return &awsargs{user, host, ident}
 			} else {
 				return nil
 			}
@@ -124,13 +151,14 @@ func ssh(args []string) int {
 func main() {
 	args := os.Args[1:]
 
-	adr := argparse(args)
-	if adr == nil {
+	aws := argparse(args)
+	if aws == nil {
+		// fallback to original ssh command
 		os.Exit(ssh(args))
 	}
 
 	// Debug
-	fmt.Printf("%s@%s\n", adr.user, adr.host)
+	fmt.Printf("%s@%s\n", aws.user, aws.host)
 
 	os.Exit(ssh(args))
 }
