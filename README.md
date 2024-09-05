@@ -22,7 +22,7 @@ If you want to push to the git repository to the EC2 instance, you can set the e
 
 ```sh
 export GIT_SSH=eish
-git remote add ec2 ec2-user@i-Ex4mp1e1n5tanc31d:/path/to/repo.git
+git remote add ec2 ec2-user@i-1234567890example:/path/to/repo.git
 ```
 
 
