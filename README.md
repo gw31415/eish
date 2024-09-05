@@ -34,7 +34,7 @@ git remote add ec2 ec2-user@i-1234567890example:/path/to/repo.git
 - [x] `[-1] [-2] [-v] ...`: Single character options without its arguments (separated by space)
 - [x] `[-i value] [-b value] ...` : Single character options with its arguments (separated by space)
 - [x] `[-2v]` : Single character options without its arguments (not separated by space)
-- [x] `[-vi value]` : Single character options with its arguments before the option (not separated by space)
+- [x] `[-vi value]` : Single character options with other options before which have no arguments (not separated by space)
 - [x] `[-ivalue]` : Single character options with its arguments just after the option (not separated by space)
 
 ### Supported options
