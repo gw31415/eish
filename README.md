@@ -1,6 +1,6 @@
 # eish
 
-SSH command wrapper with [EC2 instance Connect Endpoint](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/create-ec2-instance-connect-endpoints.html).
+SSH command wrapper with [EC2 Instance Connect Endpoint](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/create-ec2-instance-connect-endpoints.html).
 
 ## Dependencies
 
