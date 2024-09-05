@@ -18,7 +18,7 @@ Same as standard `ssh` command.
 
 ### Tips
 
-If you want to push to the git repository to the EC2 instance, you can set the env variable `GIT_SSH` (or `GIT_SSH_COMMAND`) to `eish`.
+If you want to push to the git repository in the EC2 instance, you can set the env variable `GIT_SSH` (or `GIT_SSH_COMMAND`) to `eish`.
 
 ```sh
 export GIT_SSH=eish
