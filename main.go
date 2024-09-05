@@ -152,8 +152,8 @@ func ssh(args []string) int {
 }
 
 func createSubmitIdent(arg *awsargs, tmpDir string) (string, error) {
-	priv := filepath.Join(tmpDir, "id_ed25519")
-	pub := filepath.Join(tmpDir, "id_ed25519.pub")
+	priv := filepath.Join(tmpDir, "id_eish")
+	pub := filepath.Join(tmpDir, "id_eish.pub")
 	exec.Command("ssh-keygen", "-t", "rsa", "-N", "", "-f", priv).Run()
 
 	privAbs, err := filepath.Abs(priv)
