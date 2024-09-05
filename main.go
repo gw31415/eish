@@ -198,6 +198,8 @@ func main() {
 	customOpts := []string{
 		"-o",
 		"ProxyCommand=aws ec2-instance-connect open-tunnel --instance-id %h",
+		"-o",
+		"IdentityAgent=none",
 	}
 	if aws.ident == "" {
 		privKey, err := createSubmitIdent(aws, tmpDir)
