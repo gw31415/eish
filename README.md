@@ -4,6 +4,7 @@ SSH command wrapper with [EC2 Instance Connect Endpoint](https://docs.aws.amazon
 
 ## Dependencies
 
+- standard `ssh` command
 - [awscli 2](https://aws.amazon.com/cli/)
 
 ## Installation
