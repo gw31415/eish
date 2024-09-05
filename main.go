@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	osuser "os/user"
+	"path/filepath"
 	"strings"
 )
 
@@ -15,19 +16,15 @@ const (
 	optsWithValue = "BbcDEeFIiJLlmOoPpRSWw"
 )
 
-var (
-	// awscli command available
-	awsAvailable bool
-	// ssh command available
-	sshAvailable bool
-)
+// awscli command available
+var awsAvailable bool
 
 func init() {
 	_, err := exec.LookPath("aws")
 	awsAvailable = err == nil
-
-	_, err = exec.LookPath("ssh")
-	sshAvailable = err == nil
+	// _, err = exec.LookPath("ssh")
+	// _, err2 := exec.LookPath("ssh-keygen")
+	// sshAvailable = err == nil && err2 == nil
 }
 
 func hostIsEc2Instance(host string) bool {
@@ -51,16 +48,22 @@ func hostIsEc2Instance(host string) bool {
 
 // values for ec2 instance connect
 type awsargs struct {
-	user  string
-	host  string
+	user   string
+	instId string
+	// identity file is specified only if the user explicitly specifies it
 	ident string
 }
 
 // parse arguments to get values for ec2 instance connect
-func argparse(args []string) *awsargs {
+// Returns:
+// 1. arguments after parsing
+// 2. values for ec2 instance connect
+func argparse() ([]string, *awsargs) {
+	args := os.Args[1:]
+
 	// if aws command is not available, checking process is not needed anymore
 	if !awsAvailable {
-		return nil
+		return args, nil
 	}
 
 	user, host, ident := "", "", ""
@@ -74,7 +77,7 @@ argloop:
 		if arg[0] == '-' {
 			if len(arg) == 1 {
 				// arg is just '-' (invalid)
-				return nil
+				return args, nil
 			}
 			argr := []rune(arg[1:])
 			arglen := len(argr)
@@ -104,7 +107,7 @@ argloop:
 					continue argloop
 				} else {
 					// if the option is not in the list, it should be invalid or unknown option
-					return nil
+					return args, nil
 				}
 			}
 		} else {
@@ -113,7 +116,7 @@ argloop:
 			if atat == -1 {
 				u, err := osuser.Current()
 				if err != nil {
-					return nil
+					return args, nil
 				}
 				user = u.Username
 				host = arg
@@ -126,14 +129,14 @@ argloop:
 
 			// host is ec2 instance id pattern or not
 			if hostIsEc2Instance(host) {
-				return &awsargs{user, host, ident}
+				return args, &awsargs{user, host, ident}
 			} else {
-				return nil
+				return args, nil
 			}
 		}
 		i++
 	}
-	return nil
+	return args, nil
 }
 
 // launch ssh command
@@ -148,17 +151,61 @@ func ssh(args []string) int {
 	return ssh.ProcessState.ExitCode()
 }
 
-func main() {
-	args := os.Args[1:]
+func createSubmitIdent(arg *awsargs, tmpDir string) (string, error) {
+	priv := filepath.Join(tmpDir, "id_rsa")
+	pub := filepath.Join(tmpDir, "id_rsa.pub")
+	exec.Command("ssh-keygen", "-t", "rsa", "-N", "", "-f", priv).Run()
 
-	aws := argparse(args)
+	privAbs, err := filepath.Abs(priv)
+	if err != nil {
+		return "", err
+	}
+	pubAbs, err := filepath.Abs(pub)
+	if err != nil {
+		return "", err
+	}
+
+	pubUrl := "file://" + pubAbs
+
+	exec.Command(
+		"aws",
+		"ec2-instance-connect",
+		"send-ssh-public-key",
+		"--instance-id",
+		arg.instId,
+		"--instance-os-user",
+		arg.user,
+		"--ssh-public-key",
+		pubUrl,
+	).Run()
+	return privAbs, nil
+}
+
+func main() {
+	args, aws := argparse()
 	if aws == nil {
 		// fallback to original ssh command
 		os.Exit(ssh(args))
 	}
 
-	// Debug
-	fmt.Printf("%s@%s\n", aws.user, aws.host)
+	tmpDir, err := os.MkdirTemp("", "eish-tmp-")
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(ssh(args))
+	}
+	defer os.RemoveAll(tmpDir)
 
-	os.Exit(ssh(args))
+	customOpts := []string{
+		"-o",
+		"ProxyCommand=aws ec2-instance-connect open-tunnel --instance-id %h",
+	}
+	if aws.ident != "" {
+		privKey, err := createSubmitIdent(aws, tmpDir)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(ssh(args))
+		}
+		customOpts = append(customOpts, "-i", privKey)
+	}
+	os.Exit(ssh(append(customOpts, args...)))
 }
